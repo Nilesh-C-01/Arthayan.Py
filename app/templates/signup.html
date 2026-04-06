@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arthayan.Py - User Registration</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; }
+        .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
+    </style>
+</head>
+<body class="h-screen flex items-center justify-center bg-[#0f172a] relative overflow-hidden">
+    
+    <div class="absolute top-[10%] right-[-10%] w-96 h-96 bg-blue-600 rounded-full mix-blend-multiply filter blur-[128px] opacity-20"></div>
+    <div class="absolute bottom-[10%] left-[-10%] w-96 h-96 bg-emerald-600 rounded-full mix-blend-multiply filter blur-[128px] opacity-20"></div>
+
+    <div class="glass-panel w-full max-w-md rounded-2xl p-8 relative z-10 shadow-2xl">
+        <div class="text-center mb-8">
+            <h1 class="text-2xl font-bold text-white tracking-tight">Create Account</h1>
+            <p class="text-gray-400 text-sm mt-1">Join Arthayan.Py Platform</p>
+        </div>
+
+        {% if error %}
+        <div class="bg-red-500/10 border border-red-500/50 text-red-400 text-sm p-3 rounded-lg text-center mb-6">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <form action="/signup" method="post" class="space-y-5">
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-1">Choose Username</label>
+                <input type="text" name="username" required autocomplete="off" class="w-full bg-[#0f172a] border border-gray-700 rounded-lg p-3 text-white focus:border-blue-500 focus:outline-none transition">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-1">Create Password</label>
+                <input type="password" name="password" required autocomplete="new-password" class="w-full bg-[#0f172a] border border-gray-700 rounded-lg p-3 text-white focus:border-blue-500 focus:outline-none transition">
+            </div>
+            
+            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-3 rounded-lg transition mt-4 shadow-lg shadow-emerald-500/20">Register as End User</button>
+        </form>
+        
+        <div class="mt-6 text-center border-t border-gray-700 pt-6">
+            <p class="text-sm text-gray-400">Already have an account? <a href="/" class="text-blue-400 hover:text-blue-300 font-semibold transition">Log In</a></p>
+        </div>
+    </div>
+
+    <div class="absolute bottom-4 w-full text-center text-xs text-gray-500 z-20">
+        Developed and designed by <a href="https://www.linkedin.com/in/nilesh01/" target="_blank" class="text-emerald-500 hover:text-emerald-400 font-semibold transition">Nilesh Choudhury</a>
+    </div>
+</body>
+</html>

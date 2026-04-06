@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arthayan.Py - Secure Access Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; }
+        .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .role-card:hover { border-color: #3b82f6; transform: translateY(-2px); }
+        .transition-all { transition: all 0.3s ease; }
+    </style>
+</head>
+<body class="h-screen flex items-center justify-center bg-[#0f172a] relative overflow-hidden">
+    
+    <div class="absolute top-[-10%] left-[-10%] w-96 h-96 bg-blue-600 rounded-full mix-blend-multiply filter blur-[128px] opacity-20"></div>
+    <div class="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-indigo-600 rounded-full mix-blend-multiply filter blur-[128px] opacity-20"></div>
+
+    <div class="glass-panel w-full max-w-md rounded-2xl p-8 relative z-10 shadow-2xl">
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-blue-600 text-white font-bold text-2xl mb-3 shadow-lg shadow-blue-500/30">A</div>
+            <h1 class="text-2xl font-bold text-white tracking-tight">Arthayan.Py</h1>
+            <p class="text-gray-400 text-sm mt-1">Enterprise Finance Portal</p>
+        </div>
+
+        {% if error %}
+        <div class="bg-red-500/10 border border-red-500/50 text-red-400 text-sm p-3 rounded-lg text-center mb-6">
+            {{ error }}
+        </div>
+        {% endif %}
+        
+        {% if msg %}
+        <div class="bg-emerald-500/10 border border-emerald-500/50 text-emerald-400 text-sm p-3 rounded-lg text-center mb-6">
+            {{ msg }}
+        </div>
+        {% endif %}
+
+        <div id="roleSelection" class="transition-all duration-500">
+            <p class="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-4 text-center">Select Identity Provider</p>
+            <div class="space-y-3">
+                <button onclick="selectRole('Viewer')" class="role-card w-full flex items-center p-4 bg-[#1e293b] border border-gray-700 rounded-xl transition-all cursor-pointer text-left">
+                    <div class="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-gray-300 mr-4">👤</div>
+                    <div>
+                        <h3 class="text-white font-medium">End User</h3>
+                        <p class="text-gray-400 text-xs">Manage personal ledgers & records</p>
+                    </div>
+                </button>
+                <button onclick="selectRole('Analyst')" class="role-card w-full flex items-center p-4 bg-[#1e293b] border border-gray-700 rounded-xl transition-all cursor-pointer text-left">
+                    <div class="w-10 h-10 rounded-full bg-indigo-900/50 text-indigo-400 flex items-center justify-center mr-4">📊</div>
+                    <div>
+                        <h3 class="text-white font-medium">Data Analyst</h3>
+                        <p class="text-gray-400 text-xs">Access global telemetry & charts</p>
+                    </div>
+                </button>
+                <button onclick="selectRole('Admin')" class="role-card w-full flex items-center p-4 bg-[#1e293b] border border-gray-700 rounded-xl transition-all cursor-pointer text-left">
+                    <div class="w-10 h-10 rounded-full bg-blue-900/50 text-blue-400 flex items-center justify-center mr-4">🛡️</div>
+                    <div>
+                        <h3 class="text-white font-medium">System Admin</h3>
+                        <p class="text-gray-400 text-xs">Full system override & user management</p>
+                    </div>
+                </button>
+            </div>
+            
+            <div class="mt-6 text-center border-t border-gray-700 pt-6">
+                <p class="text-sm text-gray-400">New User? <a href="/signup" class="text-blue-400 hover:text-blue-300 font-semibold transition">Create an Account</a></p>
+            </div>
+        </div>
+
+        <div id="loginForm" class="hidden transition-all duration-500 opacity-0 translate-y-4">
+            <button onclick="goBack()" class="text-gray-400 hover:text-white text-sm flex items-center mb-6 transition">
+                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg> Change Role
+            </button>
+            
+            <div class="mb-6 pb-4 border-b border-gray-700">
+                <p class="text-xs text-gray-500 font-semibold uppercase tracking-wider">Authenticating as</p>
+                <h2 id="roleTitle" class="text-xl font-semibold text-white mt-1 text-blue-400"></h2>
+            </div>
+
+            <form action="/login" method="post" class="space-y-4">
+                <input type="hidden" name="expected_role" id="expectedRoleInput">
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Username</label>
+                    <input type="text" name="username" required class="w-full bg-[#0f172a] border border-gray-700 rounded-lg p-3 text-white focus:border-blue-500 focus:outline-none transition">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Secure Password</label>
+                    <input type="password" name="password" required class="w-full bg-[#0f172a] border border-gray-700 rounded-lg p-3 text-white focus:border-blue-500 focus:outline-none transition">
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-3 rounded-lg transition mt-4 shadow-lg shadow-blue-500/20">Establish Secure Connection</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="absolute bottom-4 w-full text-center text-xs text-gray-500 z-20">
+        Developed and designed by <a href="https://www.linkedin.com/in/nilesh01/" target="_blank" class="text-blue-500 hover:text-blue-400 font-semibold transition">Nilesh Choudhury</a>
+    </div>
+
+    <script>
+        function selectRole(role) {
+            document.getElementById('roleSelection').style.display = 'none';
+            const form = document.getElementById('loginForm');
+            form.classList.remove('hidden');
+            setTimeout(() => { form.classList.remove('opacity-0', 'translate-y-4'); form.classList.add('opacity-100', 'translate-y-0'); }, 50);
+            document.getElementById('expectedRoleInput').value = role; document.getElementById('roleTitle').innerText = role + " Access";
+        }
+        function goBack() {
+            const form = document.getElementById('loginForm');
+            form.classList.add('opacity-0', 'translate-y-4'); form.classList.remove('opacity-100', 'translate-y-0');
+            setTimeout(() => { form.classList.add('hidden'); document.getElementById('roleSelection').style.display = 'block'; }, 300);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arthayan.Py - Enterprise Dashboard</title>
+    
+    <script>
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) { document.documentElement.classList.add('dark') } 
+        else if (localStorage.theme === 'light') { document.documentElement.classList.remove('dark') } 
+        else { document.documentElement.classList.add('dark') }
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class', theme: { extend: { colors: { darkBg: '#13182b', darkPanel: '#1e2538', lightBg: '#f3f4f6', lightPanel: '#ffffff' }}} }
+    </script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/11.4.0/highcharts.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/11.4.0/highcharts-3d.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/11.4.0/modules/drilldown.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; overflow-x: hidden; }
+        .table-row { transition: all 0.2s ease; }
+        .table-row:hover { background-color: rgba(156, 163, 175, 0.05); }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #6b7280; border-radius: 3px; }
+        
+        /* CORRECTED MODAL STYLES HERE */
+        .modal { display: none; position: fixed; z-index: 50; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); backdrop-filter: blur(5px); }
+        .modal-content { 
+            background-color: #202940; 
+            margin: 5% auto; /* Centers it vertically and horizontally */
+            padding: 24px; 
+            border-radius: 12px; 
+            width: 90%; 
+            max-width: 600px; /* Restricts maximum width to keep it neat */
+            animation: scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); 
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); 
+        }
+        @keyframes scaleUp { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        
+        #filterDropdown { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; transform-origin: top right; }
+        .hidden-dropdown { opacity: 0; transform: scale(0.95); pointer-events: none; }
+        .visible-dropdown { opacity: 1; transform: scale(1); pointer-events: auto; }
+        .dark .swal2-popup { background: #1e2538 !important; color: #f8f9fa !important; border: 1px solid #4b5563 !important; }
+        .dark .swal2-title { color: #f8f9fa !important; }
+        .dark .swal2-html-container { color: #9ca3af !important; }
+        .nav-btn.active { background-color: #2563eb; color: white; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.3); }
+        .dark .nav-btn:not(.active) { color: #9ca3af; }
+        .nav-btn:not(.active) { color: #4b5563; }
+        .nav-btn:not(.active):hover { background-color: rgba(156, 163, 175, 0.1); color: #2563eb; }
+        .dark .nav-btn:not(.active):hover { color: white; }
+        .view-section { display: none; animation: fadeIn 0.4s ease; }
+        .view-section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .insight-card { border: 1px solid rgba(156,163,175,0.2); }
+        .dark .insight-card { background: linear-gradient(145deg, #1e293b, #0f172a); border-color: #334155; }
+        .theme-btn.active-theme { border-color: #3b82f6; background-color: rgba(59, 130, 246, 0.1); }
+        .anomaly-pulse { animation: pulseRed 2s infinite; }
+        @keyframes pulseRed { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
+    </style>
+</head>
+<body class="flex h-screen bg-lightBg dark:bg-darkBg text-gray-900 dark:text-gray-100 transition-colors duration-300">
+
+    <aside class="w-64 flex-shrink-0 hidden md:flex flex-col bg-lightPanel dark:bg-[#1a2035] border-r border-gray-200 dark:border-white/5 transition-colors duration-300">
+        <div class="h-16 flex items-center px-6 border-b border-gray-200 dark:border-white/10">
+            <div class="w-8 h-8 rounded bg-blue-600 flex items-center justify-center font-bold text-lg text-white mr-3 shadow-lg shadow-blue-500/30">A</div>
+            <span class="text-xl font-bold tracking-wide dark:text-white text-gray-800">Arthayan.Py</span>
+        </div>
+        
+        <div class="flex-1 px-4 py-4 space-y-4 overflow-y-auto">
+            {% if role in ['Analyst', 'Admin'] %}
+            <div>
+                <button onclick="switchView('insightView', this)" class="nav-btn {% if role == 'Analyst' %}active{% endif %} w-full flex items-center px-4 py-3 rounded-lg transition font-semibold !text-emerald-600 dark:!text-emerald-400 border border-emerald-500/30 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg> Intelligence Hub
+                </button>
+            </div>
+            {% endif %}
+
+            <div>
+                <button onclick="toggleSidebarSection('opsMenu', 'opsIcon')" class="w-full flex items-center justify-between px-2 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 hover:text-gray-700 dark:hover:text-gray-300 transition focus:outline-none">
+                    <span>Operations</span>
+                    <svg id="opsIcon" class="w-4 h-4 transform transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+                <div id="opsMenu" class="space-y-2 overflow-hidden transition-all duration-300 max-h-[500px] opacity-100">
+                    {% if role != 'Analyst' %}
+                    <button onclick="switchView('logRecordView', this)" class="nav-btn {% if role != 'Analyst' %}active{% endif %} w-full flex items-center px-4 py-3 rounded-lg transition"><svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg> Log New Record</button>
+                    {% endif %}
+                    <button onclick="switchView('ledgerView', this)" class="nav-btn w-full flex items-center px-4 py-3 rounded-lg transition"><svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg> System Ledger</button>
+                    <button onclick="switchView('activityView', this)" class="nav-btn w-full flex items-center px-4 py-3 rounded-lg transition"><svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> Recent Activity</button>
+                </div>
+            </div>
+            
+            <div class="mt-2">
+                <button onclick="toggleSidebarSection('sumMenu', 'sumIcon')" class="w-full flex items-center justify-between px-2 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 hover:text-gray-700 dark:hover:text-gray-300 transition focus:outline-none">
+                    <span>Summaries</span>
+                    <svg id="sumIcon" class="w-4 h-4 transform transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+                <div id="sumMenu" class="space-y-2 overflow-hidden transition-all duration-300 max-h-[500px] opacity-100">
+                    <button onclick="openModal('categoryModal')" class="nav-btn w-full flex items-center px-4 py-2 rounded-lg transition text-sm">📊 Category Breakdown</button>
+                    <button onclick="openModal('monthlyModal')" class="nav-btn w-full flex items-center px-4 py-2 rounded-lg transition text-sm">📈 Monthly Totals</button>
+                    <button onclick="openModal('balanceModal'); render3DPie();" class="nav-btn w-full flex items-center px-4 py-2 rounded-lg transition text-sm">💰 Interactive 3D Balance</button>
+                </div>
+            </div>
+
+            {% if role == 'Admin' %}
+            <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <button onclick="switchView('adminView', this)" class="nav-btn w-full flex items-center px-4 py-3 rounded-lg transition text-rose-500 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg> System Control
+                </button>
+            </div>
+            {% endif %}
+        </nav>
+        
+        <div class="p-4 border-t border-gray-200 dark:border-white/10">
+            <button onclick="switchView('settingsView', this)" class="nav-btn w-full flex items-center px-4 py-3 rounded-lg transition text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 mb-2">
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                Settings & Profile
+            </button>
+        </div>
+
+        <div class="py-3 text-center text-[11px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-[#13182b] border-t border-gray-200 dark:border-white/5">
+            Developed & Designed by<br>
+            <a href="https://www.linkedin.com/in/nilesh01/" target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline font-semibold transition">Nilesh Choudhury</a>
+        </div>
+    </aside>
+
+    <div class="flex-1 flex flex-col h-full overflow-hidden">
+        <header class="h-16 bg-lightPanel dark:bg-darkPanel flex items-center justify-between px-6 border-b border-gray-200 dark:border-white/5 z-20 relative transition-colors duration-300">
+            <form id="searchForm" action="/dashboard" method="get" class="flex-1 flex items-center">
+                <div class="flex items-center bg-gray-100 dark:bg-[#1a2035] rounded-md border border-gray-300 dark:border-white/10 px-3 py-2 w-full max-w-2xl relative transition-colors duration-300">
+                    <svg class="w-4 h-4 text-gray-500 dark:text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    <input type="text" name="search" value="{{ search }}" placeholder="Search records..." class="bg-transparent border-none text-sm text-gray-900 dark:text-white focus:outline-none flex-1 placeholder-gray-500">
+                    <button type="button" onclick="toggleFilterMenu(event)" class="ml-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white dark:hover:bg-white/10 p-1.5 rounded-full transition flex-shrink-0"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg></button>
+                    
+                    <div id="filterDropdown" class="hidden-dropdown absolute top-full right-0 mt-3 w-72 bg-white dark:bg-darkPanel border border-gray-200 dark:border-gray-600 rounded-lg shadow-2xl overflow-hidden z-50">
+                        <div class="flex justify-between items-center px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#1a2035]"><h3 class="text-sm font-semibold dark:text-white">Filters</h3><button type="button" onclick="toggleFilterMenu(event)" class="text-gray-500 dark:text-gray-400 dark:hover:text-white"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button></div>
+                        <div class="p-4 space-y-4">
+                            <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Transaction Type</label><select name="filter_type" id="filterType" class="w-full bg-gray-50 dark:bg-[#1a2035] border border-gray-300 dark:border-gray-600 rounded p-2 text-sm focus:border-blue-500 outline-none dark:text-white"><option value="">All Types</option><option value="Income" {% if filter_type == 'Income' %}selected{% endif %}>Income</option><option value="Expense" {% if filter_type == 'Expense' %}selected{% endif %}>Expense</option></select></div>
+                            <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Category</label><input type="text" name="filter_category" id="filterCat" value="{{ filter_category }}" class="w-full bg-gray-50 dark:bg-[#1a2035] border border-gray-300 dark:border-gray-600 rounded p-2 text-sm focus:border-blue-500 outline-none dark:text-white"></div>
+                            <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Specific Month</label><input type="month" name="filter_date" id="filterDate" value="{{ filter_date }}" class="w-full bg-gray-50 dark:bg-[#1a2035] border border-gray-300 dark:border-gray-600 rounded p-2 text-sm focus:border-blue-500 outline-none dark:text-white [color-scheme:light] dark:[color-scheme:dark]"></div>
+                        </div>
+                        <div class="p-4 border-t border-gray-200 dark:border-gray-700 flex space-x-3 bg-gray-50 dark:bg-[#1a2035]"><button type="button" onclick="clearFilters()" class="flex-1 py-2 bg-gray-300 dark:bg-gray-700 hover:bg-gray-400 dark:hover:bg-gray-600 text-gray-800 dark:text-white text-sm rounded font-medium">Remove</button><button type="submit" class="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded font-medium">Apply</button></div>
+                    </div>
+                </div>
+            </form>
+            
+            <div class="flex items-center space-x-4 ml-4">
+                {% if role in ['Admin', 'Analyst'] %}
+                <a href="/export_csv" class="text-xs bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 px-3 py-1.5 rounded border border-indigo-200 dark:border-indigo-500/30 font-medium">📥 Export CSV</a>
+                {% endif %}
+                
+                <div class="flex items-center gap-3 border-l border-gray-300 dark:border-gray-700 pl-4 ml-2">
+                    <div class="flex items-center gap-2 cursor-pointer" onclick="switchView('settingsView', document.querySelector('button[onclick*=\'settingsView\']'))" title="Open Settings">
+                        <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center font-bold text-sm uppercase text-white shadow-md hover:ring-2 hover:ring-blue-400 transition">{{ username[0] }}</div>
+                        <span class="text-sm font-medium dark:text-gray-200 hidden md:block capitalize">{{ username }}</span>
+                    </div>
+                    <a href="/logout" class="text-sm text-rose-500 dark:text-rose-400 hover:text-rose-600 dark:hover:text-rose-300 transition ml-2 font-medium">Sign Out</a>
+                </div>
+            </div>
+        </header>
+
+        <main class="flex-1 overflow-x-hidden overflow-y-auto p-6 relative">
+            
+            <div id="kpiBar" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div class="bg-lightPanel dark:bg-darkPanel rounded-lg p-5 border-l-4 border-blue-500 shadow-sm"><p class="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider mb-1">Current Balance</p><h3 class="text-2xl font-bold text-gray-900 dark:text-white">₹{{ "{:,.2f}".format(balance) }}</h3></div>
+                <div class="bg-lightPanel dark:bg-darkPanel rounded-lg p-5 border-l-4 border-emerald-500 shadow-sm"><p class="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider mb-1">Total Income</p><h3 class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">+₹{{ "{:,.2f}".format(total_income) }}</h3></div>
+                <div class="bg-lightPanel dark:bg-darkPanel rounded-lg p-5 border-l-4 border-rose-500 shadow-sm"><p class="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider mb-1">Total Expenses</p><h3 class="text-2xl font-bold text-rose-600 dark:text-rose-400">-₹{{ "{:,.2f}".format(total_expense) }}</h3></div>
+            </div>
+
+            <div id="settingsView" class="view-section">
+                <div class="max-w-4xl mx-auto space-y-6">
+                    <div class="bg-lightPanel dark:bg-darkPanel rounded-xl p-8 shadow-sm border border-gray-200 dark:border-white/5 flex items-center gap-6">
+                        <div class="w-24 h-24 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-4xl uppercase text-white shadow-lg">{{ username[0] }}</div>
+                        <div>
+                            <h2 class="text-3xl font-bold text-gray-900 dark:text-white capitalize mb-1">{{ username }}</h2>
+                            <span class="inline-block bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider border border-blue-200 dark:border-blue-800/50">{{ role }} Account</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-lightPanel dark:bg-darkPanel rounded-xl p-6 shadow-sm border border-gray-200 dark:border-white/5">
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2"><svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"></path></svg> Theme Preference</h3>
+                            <div class="space-y-3">
+                                <button onclick="setTheme('light')" id="theme-light" class="theme-btn w-full flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                                    <div class="flex items-center gap-3"><span class="text-xl">☀️</span> <span class="font-medium text-gray-800 dark:text-gray-200">Light Mode</span></div>
+                                    <svg class="w-5 h-5 text-blue-500 hidden check-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                </button>
+                                <button onclick="setTheme('dark')" id="theme-dark" class="theme-btn w-full flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                                    <div class="flex items-center gap-3"><span class="text-xl">🌙</span> <span class="font-medium text-gray-800 dark:text-gray-200">Dark Mode</span></div>
+                                    <svg class="w-5 h-5 text-blue-500 hidden check-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                </button>
+                                <button onclick="setTheme('system')" id="theme-system" class="theme-btn w-full flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                                    <div class="flex items-center gap-3"><span class="text-xl">💻</span> <span class="font-medium text-gray-800 dark:text-gray-200">System Match</span></div>
+                                    <svg class="w-5 h-5 text-blue-500 hidden check-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="bg-lightPanel dark:bg-darkPanel rounded-xl p-6 shadow-sm border border-gray-200 dark:border-white/5">
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2"><svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg> Security Settings</h3>
+                            <form id="passwordForm" onsubmit="changePassword(event)" class="space-y-4">
+                                <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Current Password</label><input type="password" id="cp_current" required class="w-full bg-gray-50 dark:bg-[#1a2035] border border-gray-300 dark:border-gray-600 rounded p-2 text-sm outline-none focus:ring-1 focus:ring-blue-500 dark:text-white transition"></div>
+                                <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">New Password</label><input type="password" id="cp_new" required class="w-full bg-gray-50 dark:bg-[#1a2035] border border-gray-300 dark:border-gray-600 rounded p-2 text-sm outline-none focus:ring-1 focus:ring-blue-500 dark:text-white transition"></div>
+                                <div class="mb-4"><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Confirm New Password</label><input type="password" id="cp_confirm" required class="w-full bg-gray-50 dark:bg-[#1a2035] border border-gray-300 dark:border-gray-600 rounded p-2 text-sm outline-none focus:ring-1 focus:ring-blue-500 dark:text-white transition"></div>
+                                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg text-sm shadow-md transition flex items-center justify-center gap-2">Update Password</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if role in ['Analyst', 'Admin'] %}
+            <div id="insightView" class="view-section {% if role == 'Analyst' %}active{% endif %}">
+                <div class="mb-6 flex items-center justify-between"><h2 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2"><span class="text-emerald-500">⚡</span> Data Science Engine</h2></div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div class="bg-white dark:bg-transparent insight-card rounded-xl p-6 shadow-sm dark:shadow-none">
+                        <p class="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider mb-2">MoM Burn Variance</p>
+                        <div class="flex items-end gap-3"><h3 class="text-3xl font-bold {% if mom_variance > 0 %}text-rose-500 dark:text-rose-400{% else %}text-emerald-500 dark:text-emerald-400{% endif %}">{% if mom_variance > 0 %}↑{% else %}↓{% endif %}{{ "{:.1f}".format(abs_mom_variance) }}%</h3><span class="text-sm text-gray-500 mb-1">vs Last Month</span></div>
+                    </div>
+                    <div class="bg-white dark:bg-transparent insight-card rounded-xl p-6 shadow-sm dark:shadow-none"><p class="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider mb-2">Avg Transaction Value</p><h3 class="text-3xl font-bold text-blue-600 dark:text-blue-400">₹{{ "{:,.0f}".format(global_avg) }}</h3></div>
+                    <div class="bg-white dark:bg-transparent insight-card rounded-xl p-6 relative overflow-hidden shadow-sm dark:shadow-none">
+                        <p class="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider mb-2">Risk Status</p>
+                        {% if anomalies|length > 0 %}<div class="absolute right-0 top-0 w-16 h-16 bg-rose-100 dark:bg-rose-500/20 rounded-bl-full flex items-start justify-end p-3 anomaly-pulse"><span class="text-rose-500 dark:text-rose-400">🚨</span></div><h3 class="text-3xl font-bold text-rose-600 dark:text-rose-400">{{ anomalies|length }} Outliers</h3><span class="text-xs text-rose-600 dark:text-rose-500">Threshold: >₹{{ "{:,.0f}".format(anomaly_threshold) }}</span>
+                        {% else %}<h3 class="text-3xl font-bold text-emerald-600 dark:text-emerald-400">All Clear</h3><span class="text-xs text-emerald-600 dark:text-emerald-500">Normal behavior detected</span>{% endif %}
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <div class="bg-white dark:bg-transparent insight-card rounded-xl p-6 shadow-sm dark:shadow-none">
+                        <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">Top Spenders</h3>
+                        <div class="space-y-3">{% for user in top_spenders %}<div class="flex justify-between items-center bg-gray-50 dark:bg-[#0f172a] p-3 rounded border border-gray-200 dark:border-gray-800"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-xs font-bold dark:text-white">{{ loop.index }}</div><span class="text-gray-700 dark:text-gray-300">{{ user.user }}</span></div><span class="font-mono text-rose-500 dark:text-rose-400 font-semibold">₹{{ "{:,.0f}".format(user.amount) }}</span></div>{% endfor %}</div>
+                    </div>
+                    <div class="bg-white dark:bg-transparent insight-card rounded-xl p-6 shadow-sm dark:shadow-none">
+                        <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">Highest Avg. Cost by Category</h3>
+                        <div class="space-y-3">{% for cat in sorted_atv %}<div class="flex justify-between items-center bg-gray-50 dark:bg-[#0f172a] p-3 rounded border border-gray-200 dark:border-gray-800"><span class="text-gray-700 dark:text-gray-300">{{ cat.category }}</span><span class="font-mono text-blue-600 dark:text-blue-400 font-semibold">₹{{ "{:,.0f}".format(cat.atv) }}/tx</span></div>{% endfor %}</div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if role != 'Analyst' %}
+            <div id="logRecordView" class="view-section {% if role != 'Analyst' %}active{% endif %}">
+                <div class="bg-lightPanel dark:bg-darkPanel rounded-lg p-8 shadow-md border border-gray-200 dark:border-transparent w-full">
+                    <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-200 mb-8 border-b border-gray-200 dark:border-gray-700 pb-4">Log a New Financial Record</h2>
+                    <form action="/transaction" method="post" class="space-y-8">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div><label class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2 block">Date</label><input type="date" name="date" required class="w-full bg-gray-50 dark:bg-[#1a2035] border border-gray-300 dark:border-gray-600 rounded-lg p-3 text-gray-900 dark:text-white focus:border-blue-500 outline-none [color-scheme:light] dark:[color-scheme:dark]"></div>
+                            <div><label class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2 block">Amount (₹)</label><input type="number" step="0.01" name="amount" required class="w-full bg-gray-50 dark:bg-[#1a2035] border border-gray-300 dark:border-gray-600 rounded-lg p-3 text-gray-900 dark:text-white focus:border-blue-500 outline-none"></div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div><label class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2 block">Type</label><select name="type" class="w-full bg-gray-50 dark:bg-[#1a2035] border border-gray-300 dark:border-gray-600 rounded-lg p-3 text-gray-900 dark:text-white focus:border-blue-500 outline-none"><option value="Expense">Expense</option><option value="Income">Income</option></select></div>
+                            <div><label class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2 block">Category</label><input type="text" name="category" required class="w-full bg-gray-50 dark:bg-[#1a2035] border border-gray-300 dark:border-gray-600 rounded-lg p-3 text-gray-900 dark:text-white focus:border-blue-500 outline-none"></div>
+                        </div>
+                        <div><label class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2 block">Notes</label><textarea name="description" rows="4" class="w-full bg-gray-50 dark:bg-[#1a2035] border border-gray-300 dark:border-gray-600 rounded-lg p-3 text-gray-900 dark:text-white focus:border-blue-500 outline-none"></textarea></div>
+                        <div class="pt-4 flex justify-end"><button type="submit" class="w-full md:w-auto md:px-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg shadow-md transition">Save Record</button></div>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+
+            <div id="ledgerView" class="view-section">
+                <div class="bg-lightPanel dark:bg-darkPanel rounded-lg p-6 flex flex-col min-h-[500px] shadow-sm border border-gray-200 dark:border-transparent">
+                    <div class="flex justify-between items-center mb-6 border-b border-gray-200 dark:border-gray-700 pb-3">
+                        <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-200">{% if role in ['Admin', 'Analyst'] %} Global System Ledger {% else %} Manage Your Ledger {% endif %}</h2>
+                    </div>
+                    <div class="overflow-x-auto flex-1">
+                        <table class="w-full text-left text-sm">
+                            <thead class="sticky top-0 bg-gray-50 dark:bg-[#1a2035] text-gray-500 dark:text-gray-400 text-xs border-b border-gray-200 dark:border-gray-700 uppercase tracking-wider z-10">
+                                <tr><th class="p-4 font-medium">Date</th>{% if role in ['Admin', 'Analyst'] %}<th class="p-4 font-medium text-blue-600 dark:text-blue-300">Owner</th>{% endif %}<th class="p-4 font-medium">Tag</th><th class="p-4 font-medium">Description</th><th class="p-4 font-medium text-right">Value</th>{% if role != 'Analyst' %}<th class="p-4 font-medium text-right">Actions</th>{% endif %}</tr>
+                            </thead>
+                            <tbody class="text-gray-700 dark:text-gray-300">
+                                {% for t in transactions %}
+                                <tr class="table-row border-b border-gray-100 dark:border-gray-700/50" id="row-ledger-{{ t.id }}">
+                                    <td class="p-4 text-sm text-gray-500 dark:text-gray-400">{{ t.date.strftime('%b %d, %Y') }}</td>
+                                    {% if role in ['Admin', 'Analyst'] %}<td class="p-4 text-blue-600 dark:text-blue-400 font-semibold">{{ t.owner }}</td>{% endif %}
+                                    <td class="p-4"><span class="bg-gray-100 dark:bg-[#1a2035] border border-gray-200 dark:border-gray-600 px-3 py-1 rounded-full text-xs text-gray-600 dark:text-gray-300">{{ t.category }}</span></td>
+                                    <td class="p-4 text-sm">{{ t.description or '-' }}</td>
+                                    <td class="p-4 text-right font-mono font-bold {% if t.type == 'Income' %}text-emerald-600 dark:text-emerald-400{% else %}text-rose-600 dark:text-rose-400{% endif %}">{% if t.type == 'Income' %}+{% else %}-{% endif %}₹{{ "{:,.2f}".format(t.amount) }}</td>
+                                    {% if role != 'Analyst' %}
+                                    <td class="p-4 text-right flex justify-end gap-2">
+                                        <button onclick="openEditModal(this)" data-id="{{ t.id }}" data-date="{{ t.date.strftime('%Y-%m-%d') }}" data-amount="{{ t.amount }}" data-type="{{ t.type }}" data-category="{{ t.category }}" data-desc="{{ t.description or '' }}" class="text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-200 dark:border-blue-800/50 hover:bg-blue-100 transition">✏️</button>
+                                        <button onclick="confirmDelete({{ t.id }})" class="text-rose-600 dark:text-red-400 bg-rose-50 dark:bg-red-900/20 p-2 rounded border border-rose-200 dark:border-red-800/50 hover:bg-rose-100 transition">🗑️</button>
+                                    </td>
+                                    {% endif %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="activityView" class="view-section">
+                <div class="bg-lightPanel dark:bg-darkPanel rounded-lg p-6 flex flex-col min-h-[500px] shadow-sm border border-gray-200 dark:border-transparent">
+                    <div class="flex justify-between items-center mb-6 border-b border-gray-200 dark:border-gray-700 pb-3"><h2 class="text-lg font-semibold text-gray-900 dark:text-gray-200">Activity Log</h2></div>
+                    <div class="overflow-x-auto flex-1">
+                        <table class="w-full text-left text-sm">
+                            <thead class="text-gray-500 dark:text-gray-400 text-xs border-b border-gray-200 dark:border-gray-700 uppercase tracking-wider bg-gray-50 dark:bg-[#1a2035] sticky top-0 z-10">
+                                <tr><th class="p-4 font-medium">ID</th><th class="p-4 font-medium">Time</th>{% if role in ['Admin', 'Analyst'] %}<th class="p-4 font-medium text-blue-600 dark:text-blue-300">User</th>{% endif %}<th class="p-4 font-medium">Tag</th><th class="p-4 font-medium text-right">Impact</th></tr>
+                            </thead>
+                            <tbody class="text-gray-700 dark:text-gray-300">
+                                {% for t in transactions %}
+                                <tr class="border-b border-gray-100 dark:border-gray-700/50">
+                                    <td class="p-4 text-xs font-mono text-gray-400 dark:text-gray-500">#EVT-{{ "%04d" | format(t.id) }}</td><td class="p-4 text-sm">{{ t.date.strftime('%b %d, %Y') }}</td>
+                                    {% if role in ['Admin', 'Analyst'] %}<td class="p-4 text-blue-600 dark:text-blue-400">{{ t.owner }}</td>{% endif %}
+                                    <td class="p-4"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full {% if t.type == 'Income' %}bg-emerald-500{% else %}bg-rose-500{% endif %}"></span><span>{{ t.category }}</span></div></td>
+                                    <td class="p-4 text-right font-mono font-bold {% if t.type == 'Income' %}text-emerald-600 dark:text-emerald-400{% else %}text-rose-600 dark:text-rose-400{% endif %}">{% if t.type == 'Income' %}+{% else %}-{% endif %}₹{{ "{:,.2f}".format(t.amount) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            {% if role == 'Admin' %}
+            <div id="adminView" class="view-section">
+                <div class="bg-lightPanel dark:bg-darkPanel rounded-lg p-8 shadow-sm w-full border border-rose-300 dark:border-rose-500/20">
+                    <h2 class="text-xl font-semibold text-rose-600 dark:text-rose-400 mb-2">Danger Zone: Purge User Data</h2>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm mb-8">Permanently delete all transaction records associated with a specific user.</p>
+                    <form id="purgeForm" action="/admin/purge_user" method="post" class="space-y-6">
+                        <div class="max-w-md">
+                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">Select Target User Account</label>
+                            <select id="purgeUserSelect" name="target_user" required class="w-full bg-white dark:bg-[#0f172a] border border-rose-300 dark:border-rose-500/30 rounded-lg p-3 text-gray-900 dark:text-white outline-none">
+                                <option value="" disabled selected>-- Select an End User --</option>
+                                {% for v in all_viewers %} <option value="{{ v }}">{{ v }}</option> {% endfor %}
+                            </select>
+                        </div>
+                        <div class="pt-2"><button type="button" onclick="confirmPurge()" class="bg-rose-600 hover:bg-rose-700 text-white font-semibold py-3 px-6 rounded-lg">Execute Total Purge</button></div>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+        </main>
+    </div>
+
+    <div id="editModal" class="modal">
+        <div class="modal-content bg-white dark:bg-darkPanel border border-gray-200 dark:border-gray-600">
+            <div class="flex justify-between items-center mb-6 border-b border-gray-200 dark:border-gray-700 pb-3"><h2 class="text-xl font-semibold text-gray-900 dark:text-white">Modify Record</h2><span class="close text-gray-400 hover:text-gray-900 dark:hover:text-white cursor-pointer text-2xl" onclick="closeModal('editModal')">&times;</span></div>
+            <form id="editForm" method="post" class="space-y-5">
+                <div class="grid grid-cols-2 gap-5"><div><label class="text-xs text-gray-600 dark:text-gray-400">Date</label><input type="date" id="edit-date" name="date" required class="w-full bg-gray-50 dark:bg-[#1a2035] border border-gray-300 dark:border-gray-600 rounded p-2 text-gray-900 dark:text-white outline-none"></div><div><label class="text-xs text-gray-600 dark:text-gray-400">Amount</label><input type="number" step="0.01" id="edit-amount" name="amount" required class="w-full bg-gray-50 dark:bg-[#1a2035] border border-gray-300 dark:border-gray-600 rounded p-2 text-gray-900 dark:text-white outline-none"></div></div>
+                <div class="grid grid-cols-2 gap-5"><div><label class="text-xs text-gray-600 dark:text-gray-400">Type</label><select id="edit-type" name="type" class="w-full bg-gray-50 dark:bg-[#1a2035] border border-gray-300 dark:border-gray-600 rounded p-2 text-gray-900 dark:text-white outline-none"><option value="Expense">Expense</option><option value="Income">Income</option></select></div><div><label class="text-xs text-gray-600 dark:text-gray-400">Category</label><input type="text" id="edit-category" name="category" required class="w-full bg-gray-50 dark:bg-[#1a2035] border border-gray-300 dark:border-gray-600 rounded p-2 text-gray-900 dark:text-white outline-none"></div></div>
+                <div><label class="text-xs text-gray-600 dark:text-gray-400">Notes</label><textarea id="edit-desc" name="description" rows="2" class="w-full bg-gray-50 dark:bg-[#1a2035] border border-gray-300 dark:border-gray-600 rounded p-2 text-gray-900 dark:text-white outline-none"></textarea></div>
+                <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded shadow-md">Commit Changes</button>
+            </form>
+        </div>
+    </div>
+    
+    <div id="categoryModal" class="modal"><div class="modal-content bg-white dark:bg-darkPanel border-gray-200 dark:border-gray-600"><div class="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-2"><h2 class="text-lg text-gray-900 dark:text-white">Radar</h2><span class="close text-gray-400 text-2xl" onclick="closeModal('categoryModal')">&times;</span></div><div class="h-64"><canvas id="radarChartCat"></canvas></div></div></div>
+    <div id="monthlyModal" class="modal"><div class="modal-content bg-white dark:bg-darkPanel border-gray-200 dark:border-gray-600"><div class="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-2"><h2 class="text-lg text-gray-900 dark:text-white">Monthly Flow</h2><span class="close text-gray-400 text-2xl" onclick="closeModal('monthlyModal')">&times;</span></div><div class="h-64"><canvas id="barChartMonth"></canvas></div></div></div>
+    <div id="balanceModal" class="modal"><div class="modal-content bg-white dark:bg-darkPanel border-gray-200 dark:border-gray-600"><div class="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-2"><h2 class="text-lg text-gray-900 dark:text-white">3D Balance</h2><span class="close text-gray-400 text-2xl" onclick="closeModal('balanceModal')">&times;</span></div><div id="hc-balance-container" class="h-96 w-full"></div></div></div>
+
+    <script>
+        function updateThemeUI(mode) {
+            document.querySelectorAll('.theme-btn').forEach(btn => { btn.classList.remove('active-theme'); btn.querySelector('.check-icon').classList.add('hidden'); });
+            let activeId = 'theme-system'; if (mode === 'dark') activeId = 'theme-dark'; if (mode === 'light') activeId = 'theme-light';
+            const activeBtn = document.getElementById(activeId);
+            if(activeBtn){ activeBtn.classList.add('active-theme'); activeBtn.querySelector('.check-icon').classList.remove('hidden'); }
+        }
+        function setTheme(mode) {
+            if (mode === 'dark') { localStorage.theme = 'dark'; document.documentElement.classList.add('dark'); } 
+            else if (mode === 'light') { localStorage.theme = 'light'; document.documentElement.classList.remove('dark'); } 
+            else { localStorage.removeItem('theme'); if (window.matchMedia('(prefers-color-scheme: dark)').matches) { document.documentElement.classList.add('dark'); } else { document.documentElement.classList.remove('dark'); } }
+            updateThemeUI(mode); renderCharts();
+        }
+        window.addEventListener('DOMContentLoaded', () => {
+            let current = 'system'; if (localStorage.theme === 'dark') current = 'dark'; if (localStorage.theme === 'light') current = 'light';
+            updateThemeUI(current); renderCharts();
+        });
+
+        function changePassword(e) {
+            e.preventDefault();
+            const curr = document.getElementById('cp_current').value, newp = document.getElementById('cp_new').value, conf = document.getElementById('cp_confirm').value;
+            if(newp !== conf) { Swal.fire({icon:'error', title:'Mismatch', text:'New passwords do not match!', background: document.documentElement.classList.contains('dark') ? '#1e2538' : '#fff'}); return; }
+            const formData = new FormData(); formData.append('current_password', curr); formData.append('new_password', newp);
+            fetch('/change_password', { method: 'POST', body: formData }).then(res => res.json()).then(data => {
+                if(data.success) { Swal.fire({icon:'success', title:'Success', text:data.msg, background: document.documentElement.classList.contains('dark') ? '#1e2538' : '#fff'}); e.target.reset(); } 
+                else { Swal.fire({icon:'error', title:'Error', text:data.msg, background: document.documentElement.classList.contains('dark') ? '#1e2538' : '#fff'}); }
+            });
+        }
+
+        function toggleSidebarSection(m, i) { const el=document.getElementById(m), ic=document.getElementById(i); if(el.classList.contains('max-h-[500px]')){el.classList.remove('max-h-[500px]','opacity-100'); el.classList.add('max-h-0','opacity-0'); ic.classList.add('-rotate-90');} else{el.classList.remove('max-h-0','opacity-0'); el.classList.add('max-h-[500px]','opacity-100'); ic.classList.remove('-rotate-90');}}
+        function switchView(v, b) { 
+            document.querySelectorAll('.view-section').forEach(e=>e.classList.remove('active')); document.getElementById(v).classList.add('active'); 
+            document.querySelectorAll('.nav-btn').forEach(e=>e.classList.remove('active')); if(b)b.classList.add('active'); 
+            const kpi = document.getElementById('kpiBar'); if(v === 'settingsView') { kpi.style.display = 'none'; } else { kpi.style.display = 'grid'; }
+        }
+        
+        function openEditModal(b) { ['date','amount','type','category','desc'].forEach(f=>document.getElementById(`edit-${f}`).value=b.getAttribute(`data-${f}`)); document.getElementById('editForm').action="/transaction/update/"+b.getAttribute('data-id'); openModal('editModal'); }
+        function confirmDelete(id) { const isDark = document.documentElement.classList.contains('dark'); Swal.fire({title:'Delete?', icon:'warning', showCancelButton:true, background: isDark?'#1e2538':'#fff', confirmButtonColor:'#ef4444'}).then(r=>{if(r.isConfirmed){fetch(`/transaction/delete/${id}`, {method:'POST'}).then(()=>window.location.reload());}}) }
+        function confirmPurge() { const u=document.getElementById('purgeUserSelect').value; if(!u)return; const isDark = document.documentElement.classList.contains('dark'); Swal.fire({title:`Purge ${u}?`, icon:'error', showCancelButton:true, background: isDark?'#1e2538':'#fff', confirmButtonColor:'#e11d48'}).then(r=>{if(r.isConfirmed)document.getElementById('purgeForm').submit();}) }
+        
+        const fm = document.getElementById('filterDropdown'); function toggleFilterMenu(e) { e.preventDefault(); fm.classList.toggle('hidden-dropdown'); fm.classList.toggle('visible-dropdown'); }
+        function clearFilters() { ['filterType','filterCat','filterDate'].forEach(f=>document.getElementById(f).value=""); document.getElementById('searchForm').submit(); }
+        function openModal(id) { document.getElementById(id).style.display="block"; } function closeModal(id) { document.getElementById(id).style.display="none"; }
+        window.onclick = e => { if(e.target.classList.contains('modal')) e.target.style.display="none"; if (!fm.contains(e.target) && !e.target.closest('button[onclick="toggleFilterMenu(event)"]') && fm.classList.contains('visible-dropdown')) { fm.classList.add('hidden-dropdown'); fm.classList.remove('visible-dropdown'); } }
+
+        let radarChart, barChart;
+        function renderCharts() {
+            const isDark = document.documentElement.classList.contains('dark');
+            const textColor = isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.7)';
+            const gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+            Chart.defaults.color = textColor; Chart.defaults.font.family="'Inter',sans-serif";
+            if(radarChart) radarChart.destroy(); if(barChart) barChart.destroy();
+            radarChart = new Chart(document.getElementById('radarChartCat'), {type:'radar', data:{labels:{{chart_labels|safe}}, datasets:[{label:'Expense', data:{{chart_data|safe}}, backgroundColor:'rgba(59,130,246,0.4)', borderColor:'#3b82f6'}]}, options:{responsive:true, maintainAspectRatio:false, scales:{r:{angleLines:{color:gridColor}, grid:{color:gridColor}, ticks:{display:false}}}, plugins:{legend:{display:false}}}});
+            barChart = new Chart(document.getElementById('barChartMonth'), {type:'bar', data:{labels:{{monthly_labels|safe}}, datasets:[{label:'Net', data:{{monthly_data|safe}}, backgroundColor:'#3b82f6'}]}, options:{responsive:true, maintainAspectRatio:false, scales:{x:{grid:{color:gridColor}}, y:{grid:{color:gridColor}}}}});
+        }
+
+        function render3DPie() {
+            const isDark = document.documentElement.classList.contains('dark');
+            const textColor = isDark ? '#fff' : '#000';
+            const inc = {{ income_cat_labels|safe }}.map((l,i) => [l, {{income_cat_data|safe}}[i]]);
+            const exp = {{ expense_cat_labels|safe }}.map((l,i) => [l, {{expense_cat_data|safe}}[i]]);
+            Highcharts.chart('hc-balance-container', {
+                chart:{type:'pie', backgroundColor:'transparent', options3d:{enabled:true, alpha:45}, style:{fontFamily:'Inter'}}, title:{text:null},
+                plotOptions:{pie:{innerSize:100, depth:45, dataLabels:{color:textColor, style:{textOutline:'none'}}}},
+                series:[{name:'Volume', colorByPoint:true, data:[{name:'Income', y:{{total_income}}, drilldown:'Inc', color:'#10b981'}, {name:'Expense', y:{{total_expense}}, drilldown:'Exp', color:'#ef4444'}]}],
+                drilldown:{series:[{name:'Income', id:'Inc', data:inc}, {name:'Expense', id:'Exp', data:exp}]}, credits:{enabled:false}
+            });
+        }
+    </script>
+</body>
+</html>
