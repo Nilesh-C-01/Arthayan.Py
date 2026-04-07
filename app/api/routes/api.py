@@ -27,6 +27,7 @@ def get_current_user(request: Request):
 
 @router.on_event("startup")
 def seed_data():
+    """Seed initial master accounts if database is empty."""
     db = next(get_db())
     if not db.query(User).first():
         db.add_all([
@@ -35,6 +36,8 @@ def seed_data():
             User(username="viewer", password="password", role="Viewer")
         ])
         db.commit()
+
+# --- AUTHENTICATION ROUTES ---
 
 @router.get("/", response_class=HTMLResponse)
 def login_page(request: Request):
@@ -67,7 +70,7 @@ def register_user(username: str = Form(...), password: str = Form(...), db: Sess
         if existing_user.password == password:
             return RedirectResponse(url="/?msg=Account+already+exists.+Please+Log+In.", status_code=status.HTTP_302_FOUND)
         else:
-            return RedirectResponse(url="/signup?error=Username+already+taken.", status_code=status.HTTP_302_FOUND)
+            return RedirectResponse(url="/signup?error=Username+already+taken.+Password+mismatch.", status_code=status.HTTP_302_FOUND)
     
     db.add(User(username=username, password=password, role="Viewer"))
     db.commit()
@@ -79,14 +82,10 @@ def logout():
     response.delete_cookie("access_token")
     return response
 
-# --- NEW: SECURE PASSWORD CHANGE ENDPOINT ---
 @router.post("/change_password")
-def change_password(
-    request: Request, current_password: str = Form(...), new_password: str = Form(...), db: Session = Depends(get_db)
-):
+def change_password(request: Request, current_password: str = Form(...), new_password: str = Form(...), db: Session = Depends(get_db)):
     user_data = get_current_user(request)
-    if not user_data: 
-        return Response(json.dumps({"success": False, "msg": "Unauthorized"}), status_code=401)
+    if not user_data: return Response(json.dumps({"success": False, "msg": "Unauthorized"}), status_code=401)
     
     user = db.query(User).filter(User.username == user_data.get("sub")).first()
     if not user or user.password != current_password:
@@ -95,6 +94,23 @@ def change_password(
     user.password = new_password
     db.commit()
     return Response(json.dumps({"success": True, "msg": "Password updated successfully"}), status_code=200)
+
+# --- NEW: ADMIN STAFF CREATION ENDPOINT ---
+@router.post("/admin/create_user")
+def admin_create_user(request: Request, new_username: str = Form(...), new_password: str = Form(...), new_role: str = Form(...), db: Session = Depends(get_db)):
+    user_data = get_current_user(request)
+    if not user_data or user_data.get("role") != "Admin":
+        return Response(json.dumps({"success": False, "msg": "Security Violation: Unauthorized access."}), status_code=403)
+    
+    existing_user = db.query(User).filter(User.username == new_username).first()
+    if existing_user:
+        return Response(json.dumps({"success": False, "msg": f"Username '{new_username}' is already taken!"}), status_code=400)
+    
+    db.add(User(username=new_username, password=new_password, role=new_role))
+    db.commit()
+    return Response(json.dumps({"success": True, "msg": f"Account '{new_username}' successfully provisioned as {new_role}."}), status_code=200)
+
+# --- DASHBOARD & APP ROUTES ---
 
 @router.get("/dashboard", response_class=HTMLResponse)
 def dashboard(
