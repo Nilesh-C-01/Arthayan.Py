@@ -30,18 +30,8 @@
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #6b7280; border-radius: 3px; }
         
-        /* CORRECTED MODAL STYLES HERE */
         .modal { display: none; position: fixed; z-index: 50; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); backdrop-filter: blur(5px); }
-        .modal-content { 
-            background-color: #202940; 
-            margin: 5% auto; /* Centers it vertically and horizontally */
-            padding: 24px; 
-            border-radius: 12px; 
-            width: 90%; 
-            max-width: 600px; /* Restricts maximum width to keep it neat */
-            animation: scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); 
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); 
-        }
+        .modal-content { background-color: #202940; margin: 5% auto; padding: 24px; border-radius: 12px; width: 90%; max-width: 600px; animation: scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
         @keyframes scaleUp { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         
         #filterDropdown { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; transform-origin: top right; }
@@ -320,6 +310,34 @@
 
             {% if role == 'Admin' %}
             <div id="adminView" class="view-section">
+                <div class="bg-lightPanel dark:bg-darkPanel rounded-lg p-8 shadow-sm w-full border border-blue-300 dark:border-blue-500/20 mb-8">
+                    <h2 class="text-xl font-semibold text-blue-600 dark:text-blue-400 mb-2">Provision New Account</h2>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm mb-6">Securely create new Admin, Analyst, or Viewer accounts for the platform.</p>
+                    <form id="createUserForm" onsubmit="handleCreateUser(event)" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Username</label>
+                                <input type="text" id="new_username" required autocomplete="off" class="w-full bg-gray-50 dark:bg-[#1a2035] border border-gray-300 dark:border-gray-600 rounded p-2 text-sm outline-none focus:ring-1 focus:ring-blue-500 dark:text-white">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Password</label>
+                                <input type="password" id="new_password" required autocomplete="new-password" class="w-full bg-gray-50 dark:bg-[#1a2035] border border-gray-300 dark:border-gray-600 rounded p-2 text-sm outline-none focus:ring-1 focus:ring-blue-500 dark:text-white">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">System Role</label>
+                                <select id="new_role" required class="w-full bg-gray-50 dark:bg-[#1a2035] border border-gray-300 dark:border-gray-600 rounded p-2 text-sm outline-none focus:ring-1 focus:ring-blue-500 dark:text-white">
+                                    <option value="Viewer">Viewer (End User)</option>
+                                    <option value="Analyst">Data Analyst</option>
+                                    <option value="Admin">System Admin</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="pt-2">
+                            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-6 rounded-lg text-sm shadow-md transition">Create User Account</button>
+                        </div>
+                    </form>
+                </div>
+
                 <div class="bg-lightPanel dark:bg-darkPanel rounded-lg p-8 shadow-sm w-full border border-rose-300 dark:border-rose-500/20">
                     <h2 class="text-xl font-semibold text-rose-600 dark:text-rose-400 mb-2">Danger Zone: Purge User Data</h2>
                     <p class="text-gray-500 dark:text-gray-400 text-sm mb-8">Permanently delete all transaction records associated with a specific user.</p>
@@ -339,17 +357,7 @@
         </main>
     </div>
 
-    <div id="editModal" class="modal">
-        <div class="modal-content bg-white dark:bg-darkPanel border border-gray-200 dark:border-gray-600">
-            <div class="flex justify-between items-center mb-6 border-b border-gray-200 dark:border-gray-700 pb-3"><h2 class="text-xl font-semibold text-gray-900 dark:text-white">Modify Record</h2><span class="close text-gray-400 hover:text-gray-900 dark:hover:text-white cursor-pointer text-2xl" onclick="closeModal('editModal')">&times;</span></div>
-            <form id="editForm" method="post" class="space-y-5">
-                <div class="grid grid-cols-2 gap-5"><div><label class="text-xs text-gray-600 dark:text-gray-400">Date</label><input type="date" id="edit-date" name="date" required class="w-full bg-gray-50 dark:bg-[#1a2035] border border-gray-300 dark:border-gray-600 rounded p-2 text-gray-900 dark:text-white outline-none"></div><div><label class="text-xs text-gray-600 dark:text-gray-400">Amount</label><input type="number" step="0.01" id="edit-amount" name="amount" required class="w-full bg-gray-50 dark:bg-[#1a2035] border border-gray-300 dark:border-gray-600 rounded p-2 text-gray-900 dark:text-white outline-none"></div></div>
-                <div class="grid grid-cols-2 gap-5"><div><label class="text-xs text-gray-600 dark:text-gray-400">Type</label><select id="edit-type" name="type" class="w-full bg-gray-50 dark:bg-[#1a2035] border border-gray-300 dark:border-gray-600 rounded p-2 text-gray-900 dark:text-white outline-none"><option value="Expense">Expense</option><option value="Income">Income</option></select></div><div><label class="text-xs text-gray-600 dark:text-gray-400">Category</label><input type="text" id="edit-category" name="category" required class="w-full bg-gray-50 dark:bg-[#1a2035] border border-gray-300 dark:border-gray-600 rounded p-2 text-gray-900 dark:text-white outline-none"></div></div>
-                <div><label class="text-xs text-gray-600 dark:text-gray-400">Notes</label><textarea id="edit-desc" name="description" rows="2" class="w-full bg-gray-50 dark:bg-[#1a2035] border border-gray-300 dark:border-gray-600 rounded p-2 text-gray-900 dark:text-white outline-none"></textarea></div>
-                <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded shadow-md">Commit Changes</button>
-            </form>
-        </div>
-    </div>
+    <div id="editModal" class="modal"><div class="modal-content bg-white dark:bg-darkPanel border border-gray-200 dark:border-gray-600"><div class="flex justify-between items-center mb-6 border-b border-gray-200 dark:border-gray-700 pb-3"><h2 class="text-xl font-semibold text-gray-900 dark:text-white">Modify Record</h2><span class="close text-gray-400 hover:text-gray-900 dark:hover:text-white cursor-pointer text-2xl" onclick="closeModal('editModal')">&times;</span></div><form id="editForm" method="post" class="space-y-5"><div class="grid grid-cols-2 gap-5"><div><label class="text-xs text-gray-600 dark:text-gray-400">Date</label><input type="date" id="edit-date" name="date" required class="w-full bg-gray-50 dark:bg-[#1a2035] border border-gray-300 dark:border-gray-600 rounded p-2 text-gray-900 dark:text-white outline-none"></div><div><label class="text-xs text-gray-600 dark:text-gray-400">Amount</label><input type="number" step="0.01" id="edit-amount" name="amount" required class="w-full bg-gray-50 dark:bg-[#1a2035] border border-gray-300 dark:border-gray-600 rounded p-2 text-gray-900 dark:text-white outline-none"></div></div><div class="grid grid-cols-2 gap-5"><div><label class="text-xs text-gray-600 dark:text-gray-400">Type</label><select id="edit-type" name="type" class="w-full bg-gray-50 dark:bg-[#1a2035] border border-gray-300 dark:border-gray-600 rounded p-2 text-gray-900 dark:text-white outline-none"><option value="Expense">Expense</option><option value="Income">Income</option></select></div><div><label class="text-xs text-gray-600 dark:text-gray-400">Category</label><input type="text" id="edit-category" name="category" required class="w-full bg-gray-50 dark:bg-[#1a2035] border border-gray-300 dark:border-gray-600 rounded p-2 text-gray-900 dark:text-white outline-none"></div></div><div><label class="text-xs text-gray-600 dark:text-gray-400">Notes</label><textarea id="edit-desc" name="description" rows="2" class="w-full bg-gray-50 dark:bg-[#1a2035] border border-gray-300 dark:border-gray-600 rounded p-2 text-gray-900 dark:text-white outline-none"></textarea></div><button type="submit" class="w-full bg-blue-600 text-white py-3 rounded shadow-md">Commit Changes</button></form></div></div>
     
     <div id="categoryModal" class="modal"><div class="modal-content bg-white dark:bg-darkPanel border-gray-200 dark:border-gray-600"><div class="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-2"><h2 class="text-lg text-gray-900 dark:text-white">Radar</h2><span class="close text-gray-400 text-2xl" onclick="closeModal('categoryModal')">&times;</span></div><div class="h-64"><canvas id="radarChartCat"></canvas></div></div></div>
     <div id="monthlyModal" class="modal"><div class="modal-content bg-white dark:bg-darkPanel border-gray-200 dark:border-gray-600"><div class="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-2"><h2 class="text-lg text-gray-900 dark:text-white">Monthly Flow</h2><span class="close text-gray-400 text-2xl" onclick="closeModal('monthlyModal')">&times;</span></div><div class="h-64"><canvas id="barChartMonth"></canvas></div></div></div>
@@ -381,6 +389,23 @@
             fetch('/change_password', { method: 'POST', body: formData }).then(res => res.json()).then(data => {
                 if(data.success) { Swal.fire({icon:'success', title:'Success', text:data.msg, background: document.documentElement.classList.contains('dark') ? '#1e2538' : '#fff'}); e.target.reset(); } 
                 else { Swal.fire({icon:'error', title:'Error', text:data.msg, background: document.documentElement.classList.contains('dark') ? '#1e2538' : '#fff'}); }
+            });
+        }
+
+        // --- NEW: Handle User Creation ---
+        function handleCreateUser(e) {
+            e.preventDefault();
+            const u = document.getElementById('new_username').value;
+            const p = document.getElementById('new_password').value;
+            const r = document.getElementById('new_role').value;
+
+            const formData = new FormData();
+            formData.append('new_username', u); formData.append('new_password', p); formData.append('new_role', r);
+
+            fetch('/admin/create_user', { method: 'POST', body: formData }).then(res => res.json()).then(data => {
+                const isDark = document.documentElement.classList.contains('dark');
+                if(data.success) { Swal.fire({icon:'success', title:'Account Created!', text:data.msg, background: isDark ? '#1e2538' : '#fff'}); e.target.reset(); } 
+                else { Swal.fire({icon:'error', title:'Creation Failed', text:data.msg, background: isDark ? '#1e2538' : '#fff'}); }
             });
         }
 
